@@ -30,35 +30,43 @@
 /// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 /// THE SOFTWARE.
 
-import Combine
 import SwiftUI
 
-enum SettingsKey {
-  case attempts, name, latestAttempt
+let encoder = JSONEncoder()
+let decoder = JSONDecoder()
 
-  var key: String {
-    return "\(self)"
+extension AppStorage where Value: Swift.Codable {
+  @propertyWrapper
+  struct Codable {
+    private let key: SettingsKey
+    private let defaultValue: Value
+    private let defaults: UserDefaults
+    
+    init(wrappedValue: Value, _ key: SettingsKey, userDefaults: UserDefaults = .standard) {
+      self.key = key
+      self.defaultValue = wrappedValue
+      self.defaults = userDefaults
+    }
+    
+    var wrappedValue: Value {
+      get {
+        let data = self.defaults.data(forKey: self.key) ?? Data()
+        return (try? decoder.decode(Value.self, from: data)) ?? self.defaultValue
+      }
+      set {
+        let data = (try? encoder.encode(newValue)) ?? Data()
+        self.defaults.set(data, forKey: self.key)
+      }
+    }
   }
 }
 
-final class GolfModel: ObservableObject {
-  let userDefaults: UserDefaults = .standard
-
-  @AppStorage.Codable(.attempts)
-  var attempts: [Double] = [] {
-    willSet {
-      self.objectWillChange.send()
-    }
+extension UserDefaults {
+  func data(forKey key: SettingsKey) -> Data? {
+    self.data(forKey: key.key)
   }
-
-  func storeAttempt(distance: Double) {
-    self.attempts.append(distance)
-  }
-
-  @AppStorage.Codable(.name)
-  var name: String = "" {
-    willSet {
-      self.objectWillChange.send()
-    }
+  
+  func set(_ data: Data?, forKey key: SettingsKey) {
+    self.set(data, forKey: key.key)
   }
 }
